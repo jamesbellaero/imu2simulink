@@ -1,0 +1,8 @@
+First install all the stuff for MTSDK from https://www.xsens.com/download/MT/4.8/MT_Software_Suite_Linux_4.8.tar.gz
+Note this requires gcc/g++ 4.7 (not 4.6, not 4.8)
+
+Then compile with 'make'
+
+run ./imu2simulink 
+
+By default, opens /dev/ttyUSB0 at 115200 Hz and writes to 127.0.0.1:26004
