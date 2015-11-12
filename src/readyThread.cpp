@@ -17,7 +17,7 @@ void startReadyThread(const int &port, void (*callback)(bool)){
       timeout.tv_sec = 1;
       timeout.tv_usec = 0;
       select(sock+1,&set,NULL,NULL,&timeout);
-      bind(sock,(struct sockaddr*)&ready_addr,sizezof(ready_addr));
+      bind(sock,(struct sockaddr*)&ready_addr,sizeof(ready_addr));
       //Initialize as not ready to send
       bool state = false;
       while(true){
@@ -26,9 +26,9 @@ void startReadyThread(const int &port, void (*callback)(bool)){
         //Read a single byte
         uint8_t msg[1];
         int recvlen = recv(sock,msg,1,0);
-        if(msg == 1 && !state){//If simulink is running and we're not running
+        if(msg[0] == 1 && !state){//If simulink is running and we're not running
           callback(true);
-        }else if(msg == 0 && state){//If simulink has stopped and we are running
+        }else if(msg[0] == 0 && state){//If simulink has stopped and we are running
           callback(false);
         }
         //Read at rate of 200 Hz. Should be at least twice speed of filter

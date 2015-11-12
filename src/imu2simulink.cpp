@@ -18,6 +18,7 @@ Make networking port configurable from an external file
 #include <xcommunication/enumerateusbdevices.h>
 
 #include "deviceclass.h"
+#include "readyThread.h"
 
 #include <iostream>
 #include <fstream>
@@ -30,6 +31,7 @@ Make networking port configurable from an external file
 #include <sys/socket.h>
 #include <ctime>
 #include <conio.h>
+#include <thread>
 
 bool ready = false;
 void readyCallback(bool r){
@@ -140,7 +142,7 @@ int main(int argc, char* argv[]){
 
       const int readyPort = 26100;
       std::thread checkReadyThread;
-      checkReadyThread = std::thread(readyThread::startReadyThread,readyPort,readyCallback);
+      checkReadyThread = std::thread(startReadyThread,readyPort,readyCallback);
 
 
       //Start reading
