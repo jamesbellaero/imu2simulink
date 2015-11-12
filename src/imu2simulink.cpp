@@ -30,15 +30,17 @@ Make networking port configurable from an external file
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <ctime>
+#include <stdlib.h>
 #include <conio.h>
 #include <thread>
+#include <unistd.h>
 
 bool ready = false;
 void readyCallback(bool r){
   ready=r;
 }
 
-int main(int argc, char* argv[]){
+int main(int argc, char** argv){ 
   DeviceClass device;
   std::ofstream logger;
   logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out);
@@ -48,6 +50,42 @@ int main(int argc, char* argv[]){
   logger.close();
   logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out | std::ofstream::app);
   try{
+  //Check command line options
+  int c;
+  char* cval = NULL;
+  int portOut = 26015;      //First port to send data to. Rest of data is sent to subsequent ports.
+  int portReady = 26100;    //Port to which program listens for ready command
+  bool quat = false;        //When true, output delta-quaternion and delta-acceleration
+  int rate = 100;           //IMU update rate
+  bool waitReady = false;   //When false, will start sending data to port automatically
+  bool logOutputs = false;  //When true, will log all data sent to ports to ~/imu_data/data_imu.txt
+  while((c = getopt(argc,argv,"p:P:qr:wl"))!=-1)
+    switch(c){
+      case 'p'://Set portOut
+        portOut = atoi(optarg);
+        logger<<"Option p set to "<<optarg<<std::endl;
+	break;
+      case 'P'://Set portReady
+        portReady = atoi(optarg);
+	logger<<"Option P set to "<<optarg<<std::endl;
+        break;
+      case 'q'://Quaternion
+        quat = true;
+	logger<<"Option q set to true"<<std::endl;
+        break;
+      case 'r'://set IMU update rate
+        rate = std::min(atoi(optarg),100);
+	logger<<"Option r set to "<<optarg<<std::endl;
+        break;
+      case 'w'://Wait ready
+        waitReady = true;
+	logger<<"Option w set to true"<<std::endl;
+        break;
+      case 'l'://Logging
+        logOutputs = true;
+        logger<<"Option l set to true"<<std::endl;
+        break;
+    }
     std::string portName = "/dev/ttyUSB0";
     int baudRate = 115200;
     
@@ -93,9 +131,16 @@ int main(int argc, char* argv[]){
       // Configure the device. Note the differences between MTix and MTmk4
       logger << "Configuring the device..." << std::endl;
       if (mtPort.deviceId().isMtMk4()){// || mtPort.deviceId().isFmt_X000())
-        XsOutputConfiguration accConfig(XDI_Acceleration, 100);
-        XsOutputConfiguration quatConfig(XDI_RateOfTurn, 100);
-        XsOutputConfiguration sampleTimeConfig(XDI_SampleTimeFine, 100);
+	XsOutputConfiguration accConfig;
+	XsOutputConfiguration quatConfig;
+	if(!quat){
+        	accConfig = XsOutputConfiguration(XDI_Acceleration, rate);
+        	quatConfig = XsOutputConfiguration(XDI_RateOfTurn, rate);
+        }else{
+		accConfig = XsOutputConfiguration(XDI_DeltaV, rate);
+        	quatConfig = XsOutputConfiguration(XDI_DeltaQ, rate);
+	}
+	XsOutputConfiguration sampleTimeConfig(XDI_SampleTimeFine, rate);
         XsOutputConfigurationArray configArray;
         configArray.push_back(accConfig);
         configArray.push_back(quatConfig);
@@ -126,25 +171,29 @@ int main(int argc, char* argv[]){
       XsByteArray data;
       XsMessageArray msgs;
       std::ofstream out;
-      out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out);
-      out << "Time,AccX,AccY,AccZ,GyroX,GyroY,GyroZ"<<std::endl;
-      out.close();
-      
+      if(logOutputs){
+        out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out);
+        if(quat){
+          out << "Time,AccX,AccY,AccZ,QuatX,QuatY,QuatZ,QuatW"<<std::endl;
+        }else{
+          out << "Time,AccX,AccY,AccZ,GyroX,GyroY,GyroZ"<<std::endl;
+        }
+      }
       //Set up the udp sending addresses
       int sock = socket(AF_INET, SOCK_DGRAM, 0);
-      struct sockaddr_in serv_addrs[7];
-      for(int i = 0;i<7;i++){
+      struct sockaddr_in serv_addrs[8];
+      for(int i = 0;i<8;i++){
         memset(&serv_addrs[i],'0',sizeof(serv_addrs[i]));
         serv_addrs[i].sin_family = AF_INET;
-        serv_addrs[i].sin_port = htons(26015+i);
+        serv_addrs[i].sin_port = htons(portOut+i);
         inet_pton(AF_INET, "127.0.0.1", &serv_addrs[i].sin_addr);
       }
 
-      const int readyPort = 26100;
+      const int readyPort = portReady;
       std::thread checkReadyThread;
       checkReadyThread = std::thread(startReadyThread,readyPort,readyCallback);
-
-
+      bool wasReady = false;
+      XsTimeStamp tStart = XsTime::timeStampNow();
       //Start reading
       while (true){
 	      XsTimeStamp ts = XsTime::timeStampNow();
@@ -159,37 +208,71 @@ int main(int argc, char* argv[]){
           }
 
           // Get the quaternion data
-          XsVector3 rotRate = packet.calibratedGyroscopeData();
-          XsVector3 acc = packet.calibratedAcceleration();
           int sampleTime = packet.sampleTimeFine();
-          double ax,ay,az,wx,wy,wz;
-          ax = acc.at(0);
-          ay = acc.at(1);
-          az = acc.at(2);
-          wx = rotRate.at(0);
-          wy = rotRate.at(1);
-          wz = rotRate.at(2);
-          double dArr[] = {ax,ay,az,wx,wy,wz};//Sent to the socket in the upcoming for-loop
+          int dataSize = quat?8:7;
+          double dArr[dataSize];
+          if(quat){
+            XsSdiData sdi = packet.sdiData();
+            XsVector3 acc = sdi.velocityIncrement();
+            XsQuaternion quat = sdi.orientationIncrement();
+            dArr[0] = acc.at(0);
+            dArr[1] = acc.at(1);
+            dArr[2] = acc.at(2);
+            dArr[3] = quat.x();
+            dArr[4] = quat.y();
+            dArr[5] = quat.z();
+            dArr[6] = quat.w();
+          }else{
+            XsVector3 acc = packet.calibratedAcceleration();
+            XsVector3 rotRate = packet.calibratedGyroscopeData();
+            dArr[0] = acc.at(0);
+            dArr[1] = acc.at(1);
+            dArr[2] = acc.at(2);
+            dArr[3] = rotRate.at(0);
+            dArr[4] = rotRate.at(1);
+            dArr[5] = rotRate.at(2);
+          }
+          
+         
           uint8_t msg[60];
           int loc=0;
-          if(ready){
+          if(ready || !waitReady){
+            if(!wasReady && waitReady){
+              wasReady = true;
+              logger<<"Enabled"<<std::endl;
+	      tStart = XsTime::timeStampNow();
+            }
             memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
             struct sockaddr_in tempAddr = serv_addrs[0];
             sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
-            for(int i=1;i<7 ;i++){
+            if(logOutputs){
+              XsTimeStamp tNow = XsTime::timeStampNow();
+              out << sampleTime <<","<< (tNow.msTime()-tStart.msTime())<<",";
+            }
+            for(int i=1;i<dataSize;i++){
               tempAddr = serv_addrs[i];
               double d = dArr[i-1];
               uint8_t* msgD = reinterpret_cast<uint8_t*>(&d);
               sendto(sock, msgD, sizeof(double), 0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+              if(logOutputs)
+                out<<d<<",";
             }
+            if(logOutputs)
+              out<<std::endl;
+          }else if(wasReady && waitReady){
+            wasReady = false;
+            logger<<"Disabled"<<std::endl;
           }
         }
         msgs.clear();
 	      XsTimeStamp ts2 = XsTime::timeStampNow();
-        if(10 - (ts2.msTime() - ts.msTime()) > 0){
-		      XsTime::msleep(10-(ts2.msTime() - ts.msTime()));
-	      }
+        int delay = (int)(1000/rate);
+        if(delay - (ts2.msTime() - ts.msTime()) > 0){
+                      //logger<<"Sleeping for "<<(delay-(ts2.msTime()-ts.msTime()))<<std::endl;
+		      XsTime::msleep(delay -(ts2.msTime() - ts.msTime()));
+        }
       }
+      out.close();
     }
     catch (std::runtime_error const & error){
       logger << error.what() <<std::endl;
