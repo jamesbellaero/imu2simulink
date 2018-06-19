@@ -1,7 +1,11 @@
 /* 
 Author: James Bell
 Email : jtb2013@gmail.com
-Like, don't copy this I guess. Not because it's copyrighted, but because it's bad.
+Like, don't copy this I guess. Not because it's copyrighted, but because it's highly suspicious.
+
+TODO:
+Make imu port configurable from an external file
+Make networking port configurable from an external file
 */
 
 #include <xsens/xsportinfoarray.h>
@@ -149,12 +153,12 @@ int main(int argc, char* argv[])
 					qy = quat.y();
 					qz = quat.z();
 					qw = quat.w();
-          char* msg;
+          char msg[60];
           int loc=0;
-          memcpy(&msg[sizeof(double)*loc++],&sampleTime,sizeof(int));
+          memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
           memcpy(&msg[sizeof(double)*loc++],&ax,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&ay,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&az,sizeof(double));
+	  			memcpy(&msg[sizeof(double)*loc++],&ay,sizeof(double));
+	  			memcpy(&msg[sizeof(double)*loc++],&az,sizeof(double));
           memcpy(&msg[sizeof(double)*loc++],&qx,sizeof(double));
           memcpy(&msg[sizeof(double)*loc++],&qy,sizeof(double));
           memcpy(&msg[sizeof(double)*loc++],&qz,sizeof(double));
