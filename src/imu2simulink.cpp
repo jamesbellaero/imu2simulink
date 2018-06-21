@@ -26,13 +26,20 @@ Make networking port configurable from an external file
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <ctime>
 #include <conio.h>
+
 
 int main(int argc, char* argv[])
 {
 	DeviceClass device;
   std::ofstream logger;
-  logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out | std::ofstream::app);
+	logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out);
+	std::time_t nowt = std::time(0);
+  	std::tm* now = std::localtime(&nowt);
+	logger << (now->tm_year+1900)<<'-'<<(now->tm_mon+1)<<'-'<<now->tm_mday<<' '<<now->tm_hour<<':'<<now->tm_min<<':'<<now->tm_sec<< std::endl;
+	logger.close();
+	logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out | std::ofstream::app);
 	try
 	{
 		std::string portName = "/dev/ttyUSB0";
@@ -124,10 +131,10 @@ int main(int argc, char* argv[])
       struct sockaddr_in serv_addr;
       memset(&serv_addr,'0',sizeof(serv_addr));
       serv_addr.sin_family = AF_INET;
-      serv_addr.sin_port = htons(26004);
+      serv_addr.sin_port = htons(26015);
       inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
 
-			while (!_kbhit())
+			while (true)
 			{
 				device.readDataToBuffer(data);
 				device.processBufferedData(data, msgs);
@@ -165,7 +172,7 @@ int main(int argc, char* argv[])
           memcpy(&msg[sizeof(double)*loc++],&qw,sizeof(double));
           sendto(sock, msg, sizeof(msg), 0,(struct sockaddr *)&serv_addr,sizeof(serv_addr));
 					out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
-      		out << sampleTime <<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
+      		out << sampleTime <<std::endl;//<<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
 					out.close();
 					// Convert packet to euler
 					XsEuler euler = packet.orientationEuler();
