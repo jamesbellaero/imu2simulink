@@ -128,11 +128,13 @@ int main(int argc, char* argv[])
 			out.close();
       
       int sock = socket(AF_INET, SOCK_DGRAM, 0);
-      struct sockaddr_in serv_addr;
-      memset(&serv_addr,'0',sizeof(serv_addr));
-      serv_addr.sin_family = AF_INET;
-      serv_addr.sin_port = htons(26015);
-      inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+      struct sockaddr_in serv_addrs[8];
+			for(int i = 0;i<8;i++){
+				memset(&serv_addrs[i],'0',sizeof(serv_addrs[i]));
+				serv_addrs[i].sin_family = AF_INET;
+				serv_addrs[i].sin_port = htons(26015+i);
+				inet_pton(AF_INET, "127.0.0.1", &serv_addrs[i].sin_addr);
+			}
 
 			while (true)
 			{
@@ -170,7 +172,12 @@ int main(int argc, char* argv[])
           memcpy(&msg[sizeof(double)*loc++],&qy,sizeof(double));
           memcpy(&msg[sizeof(double)*loc++],&qz,sizeof(double));
           memcpy(&msg[sizeof(double)*loc++],&qw,sizeof(double));
-          sendto(sock, msg, sizeof(msg), 0,(struct sockaddr *)&serv_addr,sizeof(serv_addr));
+					struct sockaddr_in tempAddr = serv_addrs[0];
+					sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+					for(int i=1;i<8;i++){
+						tempAddr = serv_addrs[i];
+          	sendto(sock, &msg[4+sizeof(double)*(i-1)], sizeof(double), 0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+					}
 					out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
       		out << sampleTime <<std::endl;//<<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
 					out.close();
