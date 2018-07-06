@@ -37,6 +37,8 @@
 #include <xsens/xsoutputsettings.h>
 #include <xsens/xsoutputconfigurationarray.h>
 
+#include <chrono>
+
 class StreamInterface;
 
 class DeviceClass
