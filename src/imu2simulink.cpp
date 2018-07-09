@@ -1,7 +1,7 @@
 /* 
 Author: James Bell
 Email : jtb2013@gmail.com
-Like, don't copy this I guess. Not because it's copyrighted, but because it's highly suspicious.
+Like, don't copy this I guess. Not because it's copyrighted, but because it's highly suspicious in terms of quality.
 
 TODO:
 Make imu port configurable from an external file
@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
           }
           //std::cout<<std::endl;
           out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
-          out << sampleTime <<std::endl;//<<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
+          out << sampleTime <<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
           out.close();
           // Convert packet to euler
           XsEuler euler = packet.orientationEuler();
