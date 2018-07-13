@@ -12,6 +12,7 @@ Make networking port configurable from an external file
 #include <xsens/xsdatapacket.h>
 #include <xsens/xssdidata.h>
 #include <xsens/xstime.h>
+#include <xsens/xstimestamp.h>
 #include <xcommunication/legacydatapacket.h>
 #include <xcommunication/int_xsdatapacket.h>
 #include <xcommunication/enumerateusbdevices.h>
@@ -92,8 +93,8 @@ int main(int argc, char* argv[])
       logger << "Configuring the device..." << std::endl;
       if (mtPort.deviceId().isMtMk4())// || mtPort.deviceId().isFmt_X000())
       {
-        XsOutputConfiguration accConfig(XDI_DeltaV, 100);
-        XsOutputConfiguration quatConfig(XDI_DeltaQ, 100);
+        XsOutputConfiguration accConfig(XDI_Acceleration, 100);
+        XsOutputConfiguration quatConfig(XDI_RateOfTurn, 100);
         XsOutputConfiguration sampleTimeConfig(XDI_SampleTimeFine, 100);
         XsOutputConfigurationArray configArray;
         configArray.push_back(accConfig);
@@ -141,8 +142,8 @@ int main(int argc, char* argv[])
         inet_pton(AF_INET, "127.0.0.1", &serv_addrs[i].sin_addr);
       }
 
-      while (true)
-      {
+      while (true){
+	      XsTimeStamp ts = XsTime::timeStampNow();
         device.readDataToBuffer(data);
         device.processBufferedData(data, msgs);
         for (XsMessageArray::iterator it = msgs.begin(); it != msgs.end(); ++it)
@@ -189,15 +190,18 @@ int main(int argc, char* argv[])
           //std::cout<<outputD<<"\t";
           }
           //std::cout<<std::endl;
-          out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
-          out << sampleTime <<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
-          out.close();
+          //out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
+          //out << sampleTime <<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
+          //out.close();
           // Convert packet to euler
           XsEuler euler = packet.orientationEuler();
 
         }
         msgs.clear();
-        XsTime::msleep(0);
+	      XsTimeStamp ts2 = XsTime::timeStampNow();
+        if(10 - (ts2.msTime() - ts.msTime()) > 0){
+		      XsTime::msleep(10-(ts2.msTime() - ts.msTime()));
+	      }
       }
     }
     catch (std::runtime_error const & error)
