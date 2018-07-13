@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
       
       int sock = socket(AF_INET, SOCK_DGRAM, 0);
       struct sockaddr_in serv_addrs[8];
-      for(int i = 0;i<8;i++){
+      for(int i = 0;i<7;i++){
         memset(&serv_addrs[i],'0',sizeof(serv_addrs[i]));
         serv_addrs[i].sin_family = AF_INET;
         serv_addrs[i].sin_port = htons(26015+i);
@@ -156,7 +156,7 @@ int main(int argc, char* argv[])
           }
 
           // Get the quaternion data
-          XsQuaternion rotRate = packet.calibratedAcceleration();
+          XsVector3 rotRate = packet.calibratedAcceleration();
           XsVector3 acc = packet.calibratedGyroscopeData();
           int sampleTime = packet.sampleTimeFine();
           double ax,ay,az,wx,wy,wz;
