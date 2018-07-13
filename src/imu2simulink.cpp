@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
       XsMessageArray msgs;
       std::ofstream out;
       out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out);
-      out << "Time,AccX,AccY,AccZ,QuatW,QuatX,QuatY,QuatZ"<<std::endl;
+      out << "Time,AccX,AccY,AccZ,GyroX,GyroY,GyroZ"<<std::endl;
       out.close();
       
       int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -156,38 +156,27 @@ int main(int argc, char* argv[])
           }
 
           // Get the quaternion data
-          XsSdiData sdi = packet.sdiData();
-          XsQuaternion quat = sdi.orientationIncrement();
-          XsVector3 acc = sdi.velocityIncrement();
+          XsQuaternion rotRate = packet.calibratedAcceleration();
+          XsVector3 acc = packet.calibratedGyroscopeData();
           int sampleTime = packet.sampleTimeFine();
-          double ax,ay,az,qw,qx,qy,qz;
+          double ax,ay,az,wx,wy,wz;
           ax = acc.at(0);
           ay = acc.at(1);
           az = acc.at(2);
-          qx = quat.x();
-          qy = quat.y();
-          qz = quat.z();
-          qw = quat.w();
-          double dArr[] = {ax,ay,az,qx,qy,qz,qw};
+          wx = rotRate.at(0);
+          wy = rotRate.at(1);
+          wz = rotRate.at(2);
+          double dArr[] = {ax,ay,az,wx,wy,wz};//Sent to the socket in the upcoming for-loop
           uint8_t msg[60];
           int loc=0;
           memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
-          memcpy(&msg[sizeof(double)*loc++],&ax,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&ay,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&az,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&qx,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&qy,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&qz,sizeof(double));
-          memcpy(&msg[sizeof(double)*loc++],&qw,sizeof(double));
           struct sockaddr_in tempAddr = serv_addrs[0];
           sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
-          for(int i=1;i<8;i++){
+          for(int i=1;i<7 ;i++){
             tempAddr = serv_addrs[i];
             double d = dArr[i-1];
             uint8_t* msgD = reinterpret_cast<uint8_t*>(&d);
             sendto(sock, msgD, sizeof(double), 0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
-            //double outputD = *((double*)(msgD));
-          //std::cout<<outputD<<"\t";
           }
           //std::cout<<std::endl;
           //out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
