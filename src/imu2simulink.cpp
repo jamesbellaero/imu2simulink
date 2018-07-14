@@ -156,8 +156,8 @@ int main(int argc, char* argv[])
           }
 
           // Get the quaternion data
-          XsVector3 rotRate = packet.calibratedAcceleration();
-          XsVector3 acc = packet.calibratedGyroscopeData();
+          XsVector3 rotRate = packet.calibratedGyroscopeData();
+          XsVector3 acc = packet.calibratedAcceleration();
           int sampleTime = packet.sampleTimeFine();
           double ax,ay,az,wx,wy,wz;
           ax = acc.at(0);
