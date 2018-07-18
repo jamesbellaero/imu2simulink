@@ -1,9 +1,9 @@
-TARGET:= imu2simulink
+TARGET:= ../imu2simulink
 OBJLIBS	= libxcommunication libxstypes
 CPP_FILES := $(wildcard *.cpp)
 OBJECTS := $(CPP_FILES:.cpp=.o)
 OBJECTS+=conio.o
-HEADERS = $(wildcard *.h)
+HEADERS = $(wildcard *.h) $(wildcard include/*.h)
 INCLUDE=-I. -Iinclude
 CFLAGS=-g $(INCLUDE) -include config.h
 CXXFLAGS=-std=c++11 $(CFLAGS)

@@ -31,9 +31,12 @@ Make networking port configurable from an external file
 #include <ctime>
 #include <conio.h>
 
+bool ready = false;
+void readyCallback(bool r){
+  ready=r;
+}
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]){
   DeviceClass device;
   std::ofstream logger;
   logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out);
@@ -42,8 +45,7 @@ int main(int argc, char* argv[])
   logger << (now->tm_year+1900)<<'-'<<(now->tm_mon+1)<<'-'<<now->tm_mday<<' '<<now->tm_hour<<':'<<now->tm_min<<':'<<now->tm_sec<< std::endl;
   logger.close();
   logger.open(std::string(std::getenv("HOME"))+std::string("/imu_data/imu_log.log"),std::ofstream::out | std::ofstream::app);
-  try
-  {
+  try{
     std::string portName = "/dev/ttyUSB0";
     int baudRate = 115200;
     
@@ -65,8 +67,7 @@ int main(int argc, char* argv[])
     for(int i=0;i<20 && !setConfigMode;i++){
       setConfigMode = device.gotoConfig();
     }
-    if (!setConfigMode) // Failed to put the device into configuration mode before configuring the device
-    {
+    if (!setConfigMode){ // Failed to put the device into configuration mode before configuring the device
       logger << "Could not put device into configuration mode. Aborting."<<std::endl;
       logger.close();
       throw std::runtime_error("Could not put device into configuration mode. Aborting.");
@@ -76,23 +77,20 @@ int main(int argc, char* argv[])
     mtPort.setDeviceId(device.getDeviceId());
     logger << "Checking credentials"<<std::endl; 
     // Check if we have an MTi / MTx / MTmk4 device
-    if ( !mtPort.deviceId().isMtMk4())
-    {
+    if ( !mtPort.deviceId().isMtMk4()){
       logger << "" <<std::endl;
       logger.close();
       throw std::runtime_error("No MTi-100 device found. Aborting.");
     }
     logger << "Found a device with id: " << mtPort.deviceId().toString().toStdString() << " @ port: " << mtPort.portName().toStdString() << ", baudrate: " << mtPort.baudrate() << std::endl;
 
-    try
-    {
+    try{
       // Print information about detected MTi / MTx / MTmk4 device
       logger << "Device: " << device.getProductCode().toStdString() << " opened." << std::endl;
 
       // Configure the device. Note the differences between MTix and MTmk4
       logger << "Configuring the device..." << std::endl;
-      if (mtPort.deviceId().isMtMk4())// || mtPort.deviceId().isFmt_X000())
-      {
+      if (mtPort.deviceId().isMtMk4()){// || mtPort.deviceId().isFmt_X000())
         XsOutputConfiguration accConfig(XDI_Acceleration, 100);
         XsOutputConfiguration quatConfig(XDI_RateOfTurn, 100);
         XsOutputConfiguration sampleTimeConfig(XDI_SampleTimeFine, 100);
@@ -100,16 +98,14 @@ int main(int argc, char* argv[])
         configArray.push_back(accConfig);
         configArray.push_back(quatConfig);
         configArray.push_back(sampleTimeConfig);
-        if (!device.setOutputConfiguration(configArray))
-        {
+        if (!device.setOutputConfiguration(configArray)){
           logger << "Could not configure MTmk4 device. Aborting." <<std::endl;
           logger.close();
 
           throw std::runtime_error("Could not configure MTmk4 device. Aborting.");
         }
       }
-      else
-      {
+      else{
         logger << "Unknown device while configuring. Aborting." <<std::endl;
         logger.close();
         throw std::runtime_error("Unknown device while configuring. Aborting.");
@@ -117,8 +113,7 @@ int main(int argc, char* argv[])
 
       // Put the device in measurement mode
       std::cout << "Putting device into measurement mode..." << std::endl;
-      if (!device.gotoMeasurement())
-      {
+      if (!device.gotoMeasurement()){
         logger << "Could not put device into measurement mode. Aborting." <<std::endl;
         logger.close();
         throw std::runtime_error("Could not put device into measurement mode. Aborting.");
@@ -133,8 +128,9 @@ int main(int argc, char* argv[])
       out << "Time,AccX,AccY,AccZ,GyroX,GyroY,GyroZ"<<std::endl;
       out.close();
       
+      //Set up the udp sending addresses
       int sock = socket(AF_INET, SOCK_DGRAM, 0);
-      struct sockaddr_in serv_addrs[8];
+      struct sockaddr_in serv_addrs[7];
       for(int i = 0;i<7;i++){
         memset(&serv_addrs[i],'0',sizeof(serv_addrs[i]));
         serv_addrs[i].sin_family = AF_INET;
@@ -142,12 +138,17 @@ int main(int argc, char* argv[])
         inet_pton(AF_INET, "127.0.0.1", &serv_addrs[i].sin_addr);
       }
 
+      const int readyPort = 26100;
+      std::thread checkReadyThread;
+      checkReadyThread = std::thread(readyThread::startReadyThread,readyPort,readyCallback);
+
+
+      //Start reading
       while (true){
 	      XsTimeStamp ts = XsTime::timeStampNow();
         device.readDataToBuffer(data);
         device.processBufferedData(data, msgs);
-        for (XsMessageArray::iterator it = msgs.begin(); it != msgs.end(); ++it)
-        {
+        for (XsMessageArray::iterator it = msgs.begin(); it != msgs.end(); ++it){
           // Retrieve a packet
           XsDataPacket packet;
           if ((*it).getMessageId() == XMID_MtData2) {
@@ -169,22 +170,17 @@ int main(int argc, char* argv[])
           double dArr[] = {ax,ay,az,wx,wy,wz};//Sent to the socket in the upcoming for-loop
           uint8_t msg[60];
           int loc=0;
-          memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
-          struct sockaddr_in tempAddr = serv_addrs[0];
-          sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
-          for(int i=1;i<7 ;i++){
-            tempAddr = serv_addrs[i];
-            double d = dArr[i-1];
-            uint8_t* msgD = reinterpret_cast<uint8_t*>(&d);
-            sendto(sock, msgD, sizeof(double), 0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+          if(ready){
+            memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
+            struct sockaddr_in tempAddr = serv_addrs[0];
+            sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+            for(int i=1;i<7 ;i++){
+              tempAddr = serv_addrs[i];
+              double d = dArr[i-1];
+              uint8_t* msgD = reinterpret_cast<uint8_t*>(&d);
+              sendto(sock, msgD, sizeof(double), 0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+            }
           }
-          //std::cout<<std::endl;
-          //out.open(std::string(std::getenv("HOME"))+std::string("/imu_data/data_imu.txt"),std::ofstream::out | std::ofstream::app);
-          //out << sampleTime <<","<<ax<<","<<ay<<","<<az<<","<<qw<<","<<qx<<","<<qy<<","<<qz<<std::endl;
-          //out.close();
-          // Convert packet to euler
-          XsEuler euler = packet.orientationEuler();
-
         }
         msgs.clear();
 	      XsTimeStamp ts2 = XsTime::timeStampNow();
@@ -193,14 +189,12 @@ int main(int argc, char* argv[])
 	      }
       }
     }
-    catch (std::runtime_error const & error)
-    {
+    catch (std::runtime_error const & error){
       logger << error.what() <<std::endl;
       logger.close();
       std::cout << error.what() << std::endl;
     }
-    catch (...)
-    {
+    catch (...){
       logger << "An unknown fatal error has occured. Aborting." <<std::endl;
       logger.close();
       std::cout << "An unknown fatal error has occured. Aborting." << std::endl;
@@ -210,14 +204,12 @@ int main(int argc, char* argv[])
     logger << "Closing port..." << std::endl;
     device.close();
   }
-  catch (std::runtime_error const & error)
-  {
+  catch (std::runtime_error const & error){
     logger << error.what() <<std::endl;
     logger.close();
     std::cout << error.what() << std::endl;
   }
-  catch (...)
-  {
+  catch (...){
     logger << "An unknown fatal error has occured. Aborting." <<std::endl;
     logger.close();
     std::cout << "An unknown fatal error has occured. Aborting." << std::endl;
