@@ -5,4 +5,6 @@ Then compile with 'make'
 
 run ./imu2simulink 
 
-By default, opens /dev/ttyUSB0 at 115200 Hz and writes to 127.0.0.1:26004
+To write imu data, it requires that you send a '1' to 127.0.0.1:26100
+By default, opens /dev/ttyUSB0 at 115200 Hz and writes to 127.0.0.1:26016 through 127.0.0.1:26022
+Writes an int to the first port, acceleration as doubles to the next 3 ports, and gyro as doubles to the last 3.
