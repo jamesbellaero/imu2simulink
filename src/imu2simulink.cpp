@@ -196,7 +196,7 @@ int main(int argc, char** argv){
       XsTimeStamp tStart = XsTime::timeStampNow();
       //Start reading
       while (true){
-	      XsTimeStamp ts = XsTime::timeStampNow();
+        XsTimeStamp ts = XsTime::timeStampNow();
         device.readDataToBuffer(data);
         device.processBufferedData(data, msgs);
         for (XsMessageArray::iterator it = msgs.begin(); it != msgs.end(); ++it){
@@ -207,8 +207,9 @@ int main(int argc, char** argv){
             packet.setDeviceId(mtPort.deviceId());
           }
 
-          // Get the quaternion data
-          int sampleTime = packet.sampleTimeFine();
+          // Get the packet data
+          //int sampleTime = packet.sampleTimeFine();
+          double sampleTime = ts.msTime()/1000.0;
           int dataSize = quat?8:7;
           double dArr[dataSize];
           if(quat){
@@ -234,7 +235,7 @@ int main(int argc, char** argv){
           }
           
          
-          uint8_t msg[60];
+          uint8_t msg[64];
           int loc=0;
           if(ready || !waitReady){
             if(!wasReady && waitReady){
@@ -242,9 +243,9 @@ int main(int argc, char** argv){
               logger<<"Enabled"<<std::endl;
 	      tStart = XsTime::timeStampNow();
             }
-            memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
+            memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(double));
             struct sockaddr_in tempAddr = serv_addrs[0];
-            sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
+            sendto(sock,msg,sizeof(double),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
             if(logOutputs){
               XsTimeStamp tNow = XsTime::timeStampNow();
               out << sampleTime <<","<< (tNow.msTime()-tStart.msTime())<<",";

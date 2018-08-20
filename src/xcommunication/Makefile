@@ -3,7 +3,7 @@ CPP_FILES := $(wildcard *.cpp)
 C_FILES := $(wildcard *.c)
 OBJECTS := $(CPP_FILES:.cpp=.cpp.o) $(C_FILES:.c=.c.o)
 CFLAGS+= -I../include -I../include/xcommunication -include xcommunicationconfig.h
-CXXFLAGS+= -std=c++11 -I../include -I../include/xcommunication -include xcommunicationconfig.h
+CXXFLAGS+= -shared -std=c++11 -I../include -I../include/xcommunication -include xcommunicationconfig.h
 
 HAVE_LIBUSB?=0
 ifeq ($(HAVE_LIBUSB), 1)
