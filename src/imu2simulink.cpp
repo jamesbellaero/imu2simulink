@@ -89,7 +89,7 @@ int main(int argc, char** argv){
     std::string portName = "/dev/ttyUSB0";
     int baudRate = 115200;
     
-    // Use the first detected device
+    // Use the device at port portName
     XsPortInfo mtPort(portName,XsBaud::numericToRate(baudRate));
 
     
