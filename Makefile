@@ -4,7 +4,6 @@ XSENS_PUBLIC_SOURCE?=$(XSENS_INSTALL_PREFIX)/public
 IMU2SIMULINK_PREREQS:=src/xstypes src/include src/xcommunication
 COMMON_TARGETS=src
 TARGETS=$(COMMON_TARGETS)
-
 CLEAN_COMMON_TARGETS=$(patsubst %,%.clean,$(COMMON_TARGETS))
 CLEAN_TARGETS=$(patsubst %,%.clean,$(TARGETS))
 

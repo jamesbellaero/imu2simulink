@@ -28,8 +28,10 @@ void startReadyThread(const int &port, void (*callback)(bool)){
         int recvlen = recv(sock,msg,1,0);
         if(msg[0] == 1 && !state){//If simulink is running and we're not running
           callback(true);
+          state=true;
         }else if(msg[0] == 0 && state){//If simulink has stopped and we are running
           callback(false);
+          state=false;
         }
         //Read at rate of 200 Hz. Should be at least twice speed of filter
         XsTimeStamp ts2 = XsTime::timeStampNow();

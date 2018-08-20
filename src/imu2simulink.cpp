@@ -193,7 +193,7 @@ int main(int argc, char** argv){
       std::thread checkReadyThread;
       checkReadyThread = std::thread(startReadyThread,readyPort,readyCallback);
       bool wasReady = false;
-
+      XsTimeStamp tStart = XsTime::timeStampNow();
       //Start reading
       while (true){
 	      XsTimeStamp ts = XsTime::timeStampNow();
@@ -240,13 +240,16 @@ int main(int argc, char** argv){
             if(!wasReady && waitReady){
               wasReady = true;
               logger<<"Enabled"<<std::endl;
+	      tStart = XsTime::timeStampNow();
             }
             memcpy(&msg[sizeof(int)*loc++],&sampleTime,sizeof(int));
             struct sockaddr_in tempAddr = serv_addrs[0];
             sendto(sock,msg,sizeof(int),0,(struct sockaddr *)&tempAddr,sizeof(tempAddr));
-            if(logOutputs)
-              out << sampleTime;
-            for(int i=1;i<dataSize ;i++){
+            if(logOutputs){
+              XsTimeStamp tNow = XsTime::timeStampNow();
+              out << sampleTime <<","<< (tNow.msTime()-tStart.msTime())<<",";
+            }
+            for(int i=1;i<dataSize;i++){
               tempAddr = serv_addrs[i];
               double d = dArr[i-1];
               uint8_t* msgD = reinterpret_cast<uint8_t*>(&d);
@@ -263,8 +266,10 @@ int main(int argc, char** argv){
         }
         msgs.clear();
 	      XsTimeStamp ts2 = XsTime::timeStampNow();
-        if(10 - (ts2.msTime() - ts.msTime()) > 0){
-		      XsTime::msleep(10-(ts2.msTime() - ts.msTime()));
+        int delay = (int)(1000/rate);
+        if(delay - (ts2.msTime() - ts.msTime()) > 0){
+                      //logger<<"Sleeping for "<<(delay-(ts2.msTime()-ts.msTime()))<<std::endl;
+		      XsTime::msleep(delay -(ts2.msTime() - ts.msTime()));
         }
       }
       out.close();
